@@ -36,7 +36,7 @@ const usePrevious = (value) => {
 }
 
 const transitionTimes = {
-  moving: 350,
+  moving: 450,
   dropping: 350
 }
 
@@ -185,7 +185,7 @@ const useDrag = () => {
   }
 
   const getPlaceholderStyle = () => {
-    const styles = listState === "dragging" ? {
+    const styles = ["dragging", "dropping"].includes(listState) ? {
       height: itemDimensions.height,
       width: itemDimensions.width,
       margin: `${Object.values(itemDimensions.margin).join('px ')}px`
@@ -225,7 +225,9 @@ const useDrag = () => {
   }, [ grabbingIndex, itemWrap ])
 
   const getDropPosition = React.useCallback(() => {
-    if (draggingOver === null) return { transform: `translate(0px, 0px)`}
+    const scrollPos = [window.scrollX, window.scrollY]
+    
+    if (draggingOver === null) return { transform: `translate(${scrollPos[0]}px, ${scrollPos[1]}px)`}
 
     const startXY = [ dragStart[0] + itemDimensions.margin.left, dragStart[1] + itemDimensions.margin.top ]
     
@@ -236,7 +238,7 @@ const useDrag = () => {
     const oldTranslate = draggingEl.current.style.transform.match(/-?\d+/g)
     const translateDiff = dropXY.map((axis, index) => axis - (startXY[index] + (parseInt(oldTranslate[index]))))
 
-    const newTranslate = oldTranslate.map((axis, index) => parseInt(axis) + translateDiff[index])
+    const newTranslate = oldTranslate.map((axis, index) => parseInt(axis) + translateDiff[index] - scrollPos[index])
 
     return { transform: `translate(${newTranslate[0]}px, ${newTranslate[1]}px)`}
   }, [ draggingOver, dragStart, listEl, listOffset, itemWrap, itemDimensions ])
@@ -266,7 +268,7 @@ const useDrag = () => {
       
       const itemStyle = {
         order: index,
-        ...(previousState !== "grabbing") && {transition: `transform ${transitionTimes.moving}ms cubic-bezier(0.23, 1, 0.32, 1)`}
+        ...(previousState !== "grabbing") && {transition: `transform ${transitionTimes.moving}ms cubic-bezier(0.2, 0, 0, 1)`}
       }
 
       if (shouldShift(index)) {

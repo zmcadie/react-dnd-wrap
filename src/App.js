@@ -10,25 +10,26 @@ const ModeButton = styled.div`
 `
 
 const Header = styled.div`
-  color: white;
   background: ${p => p.mode === "Board" ? "#ff6040" : "#4060ff"};
   border: 4px solid ${p => p.mode === "Board" ? "#ff6040" : "#4060ff"};
+  color: white;
   display: flex;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  font-size: 1rem;
   justify-content: space-between;
+  left: 0;
   line-height: 50px;
   padding-left: 50px;
-  font-size: 1rem;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 5;
 
   & > ${ModeButton} {
     background: ${p => p.mode === "Board" ? "#4060ff" : "#ff6040"};
   }
 `
 
-const items = Array(15).fill("").map((x, i) => i + 1)
+const items = Array(50).fill("").map((x, i) => i + 1)
 
 function App() {
   const [mode, setMode] = React.useState('Custom')

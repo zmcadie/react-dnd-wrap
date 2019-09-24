@@ -45,7 +45,7 @@ const CustomDrag = ({ items }) => {
 
   React.useEffect(() => {
     const handleDragStart = (e) => {
-      // console.log('drag started at: ', e.detail.source)
+      // do something here
     }
     window.addEventListener('usedrag-dragstart', handleDragStart)
     return () => window.removeEventListener('usedrag-dragstart', handleDragStart)
@@ -53,9 +53,7 @@ const CustomDrag = ({ items }) => {
   
   React.useEffect(() => {
     const handleDragUpdate = (e) => {
-      // console.log('drag update detected')
-      // console.log('source: ', e.detail.source)
-      // console.log('destination: ', e.detail.destination)
+      // do something here
     }
     window.addEventListener('usedrag-dragupdate', handleDragUpdate)
     return () => window.removeEventListener('usedrag-dragupdate', handleDragUpdate)
@@ -63,6 +61,7 @@ const CustomDrag = ({ items }) => {
   
   React.useEffect(() => {
     const handleDragEnd = ({detail: {source, destination}}) => {
+      if (source === destination || destination === null) return
       const newList = [...listItems]
       const el = newList.splice(source, 1)
       newList.splice(destination, 0, el)
