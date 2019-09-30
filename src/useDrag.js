@@ -1,4 +1,5 @@
 import React from 'react'
+import deepEqual from 'deep-equal'
 
 // add custom event functionality to IE >= 9
 // 
@@ -84,6 +85,11 @@ const useDrag = () => {
   // difference between the bounds of the list element and the bounds items in the list may occupy
   // format {x, y} representing list padding and border width, plus item margin for left and top for x, y accordingly
   const [listOffset, setListOffset] = React.useState()
+  // handle auto scrolling when a dragged item is near the edge of the screen
+  const [autoScroll, setAutoScroll]= React.useState(false)
+  const [autoScrollId, setAutoScrollId]= React.useState(null)
+
+  const previousAutoScroll = usePrevious(autoScroll)
 
   const previousState = usePrevious(listState)
   const previousDraggingOver = usePrevious(draggingOver)
@@ -110,12 +116,7 @@ const useDrag = () => {
   }, [])
 
   // find what index in the wrapped list the dragged item is being dragged over
-  const getDraggingOver = React.useCallback(el => {
-    const bounds = el.getBoundingClientRect()
-    const center = {
-      x: bounds.x + (bounds.width / 2),
-      y: bounds.y + (bounds.height / 2)
-    }
+  const getDraggingOver = React.useCallback(center => {
     const listBounds = listEl.current.getBoundingClientRect()
 
     // check if element is within list
@@ -128,6 +129,49 @@ const useDrag = () => {
     
     return leftIndex + topIndex * itemWrap
   }, [ itemWrap, itemDimensions, listOffset ])
+
+  const handleDragScroll = React.useCallback(bounds => {
+    const { offsetHeight, offsetWidth, clientHeight, clientWidth } = document.documentElement
+    const { scrollY, scrollX } = window
+    if (offsetHeight <= clientHeight && offsetWidth <= clientWidth) return false
+
+    const scrollBy = [0, 0]
+
+    if (scrollX && bounds.left < 50) {
+      scrollBy[0] = -5
+    } else if (scrollX < offsetWidth - clientWidth && bounds.left > clientWidth - 50) {
+      scrollBy[0] = 5
+    }
+
+    if (scrollY && bounds.top < 50) {
+      scrollBy[1] = -5
+    } else if (scrollY < offsetHeight - clientHeight && bounds.bottom > clientHeight - 50) {
+      scrollBy[1] = 5
+    }
+
+    if (!autoScroll) {
+      if (!deepEqual(scrollBy, [0, 0])) {
+        setAutoScroll(scrollBy)
+      }
+    } else {
+      if (!deepEqual(autoScroll, scrollBy)) {
+        setAutoScroll(deepEqual(scrollBy, [0, 0]) ? false : scrollBy)
+      }
+    }
+  }, [autoScroll])
+
+  React.useEffect(() => {
+    if (!!autoScroll && !deepEqual(autoScroll, previousAutoScroll)) {
+      if (autoScrollId) {
+        window.clearInterval(autoScrollId)
+      }
+      const interval = window.setInterval(() => window.scrollBy(...autoScroll), 10)
+      setAutoScrollId(interval)
+    } else if (!autoScroll && !!autoScrollId) {
+      window.clearInterval(autoScrollId)
+      setAutoScrollId(null)
+    }
+  }, [autoScroll, autoScrollId, previousAutoScroll])
   
   React.useEffect(() => {
     const handleMouseMove = e => {
@@ -140,24 +184,58 @@ const useDrag = () => {
           ? [parseInt(oldTranslate[0]) + e.movementX, parseInt(oldTranslate[1]) + e.movementY]
           : [e.movementX, e.movementY]
         el.style.transform = `translate(${newTranslate[0]}px, ${newTranslate[1]}px)`
+
+        const bounds = el.getBoundingClientRect()
+        const center = {
+          x: bounds.x + (bounds.width / 2),
+          y: bounds.y + (bounds.height / 2)
+        }
+
+        handleDragScroll(bounds)
         
-        const newDraggingOver = getDraggingOver(el)
+        const newDraggingOver = getDraggingOver(center)
         if (newDraggingOver !== draggingOver) setDraggingOver(newDraggingOver)
       }
     }
+
     window.addEventListener('mousemove', handleMouseMove)
-    return () => {window.removeEventListener('mousemove', handleMouseMove)}
-  }, [ grabbingIndex, dragStart, draggingOver, getDraggingOver, listState ])
+    return () => { window.removeEventListener('mousemove', handleMouseMove) }
+  }, [ draggingOver, getDraggingOver, listState, handleDragScroll ])
+  
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (["grabbing", "dragging"].includes(listState)) {
+        if (listState === "grabbing") setListState("dragging")
+        
+        const el = draggingEl.current
+        const bounds = el.getBoundingClientRect()
+        const center = {
+          x: bounds.x + (bounds.width / 2),
+          y: bounds.y + (bounds.height / 2)
+        }
+
+        const newDraggingOver = getDraggingOver(center)
+        if (newDraggingOver !== draggingOver) setDraggingOver(newDraggingOver)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => { window.removeEventListener('scroll', handleScroll) }
+  }, [ draggingOver, getDraggingOver, listState ])
 
   React.useEffect(() => {
     const handleMouseUp = () => {
       if (draggingEl.current) {
         setListState(listState === "dragging" ? "dropping" : null)
       }
+      if (autoScrollId) {
+        window.clearInterval(autoScrollId)
+        setAutoScrollId(null)
+      }
     }
     window.addEventListener('mouseup', handleMouseUp)
     return () => {window.removeEventListener('mouseup', handleMouseUp)}
-  }, [ listState, draggingEl ])
+  }, [ listState, draggingEl, autoScrollId ])
 
   React.useEffect(() => {
     if (listState === "dropping") {
