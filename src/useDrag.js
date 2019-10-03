@@ -72,7 +72,7 @@ const useDrag = () => {
   const [listState, setListState] = React.useState(null)
   // original index of item being dragged
   const [grabbingIndex, setGrabbingIndex] = React.useState(null)
-  // x, y coordinates representing dragging items original position on screen, format [x, y]
+  // x, y coordinates representing dragging items original position on screen, format [x, y, scrollX, scrollY]
   const [dragStart, setDragStart] = React.useState(false)
   // index of list the dragged item is being dragged over
   const [draggingOver, setDraggingOver] = React.useState(null)
@@ -258,7 +258,7 @@ const useDrag = () => {
     setGrabbingIndex(index)
     setDraggingOver(index)
     const bounds = e.currentTarget.getBoundingClientRect() 
-    setDragStart([bounds.x - itemDimensions.margin.left, bounds.y - itemDimensions.margin.top])
+    setDragStart([bounds.x - itemDimensions.margin.left, bounds.y - itemDimensions.margin.top, window.scrollX, window.scrollY])
     draggingEl.current = e.currentTarget
   }
 
@@ -277,7 +277,7 @@ const useDrag = () => {
   // determine whether element at given index needs to shift out of the way of the dragging element
   const shouldShift = React.useCallback(i => {
     // check if an element is being dragged
-    return ["dragging", "dropping"].includes(listState)
+    if (listState === "dragging"
       // make sure this element is not the element being dragged
       && i !== parseInt(grabbingIndex)
       // make sure the dragged element is dragging over the container
@@ -286,7 +286,18 @@ const useDrag = () => {
       && (draggingOver >= grabbingIndex
         ? i > draggingOver
         : i >= draggingOver
-      )
+      )) return true
+    
+    const droppingIndex = Number.isInteger(draggingOver) ? draggingOver : grabbingIndex
+    
+    if (listState === "dropping"
+      // make sure this element is not the element being dragged
+      && i !== parseInt(grabbingIndex)
+      // check item appears after item being dragged over
+      && (droppingIndex >= grabbingIndex
+        ? i > droppingIndex
+        : i >= droppingIndex
+      )) return true
   }, [ listState, grabbingIndex, draggingOver ])
 
   // determine whether item needs to wrap up/down to a new line when shifting
@@ -305,7 +316,7 @@ const useDrag = () => {
   const getDropPosition = React.useCallback(() => {
     const scrollPos = [window.scrollX, window.scrollY]
     
-    if (draggingOver === null) return { transform: `translate(${scrollPos[0]}px, ${scrollPos[1]}px)`}
+    if (draggingOver === null) return { transform: `translate(${dragStart[2] - scrollPos[0]}px, ${dragStart[3] - scrollPos[1]}px)`}
 
     const startXY = [ dragStart[0] + itemDimensions.margin.left, dragStart[1] + itemDimensions.margin.top ]
     
@@ -341,7 +352,7 @@ const useDrag = () => {
         pointerEvents: "none",
         zIndex: "2",
         order: index,
-        transition: `transform ${transitionTimes.dropping}ms cubic-bezier(0.23, 1, 0.32, 1)`
+        transition: `transform ${transitionTimes.dropping}ms cubic-bezier(${draggingOver === null ? "0.32, 0, 0.32, 1" : "0.23, 1, 0.32, 1"})`
       }
       
       const itemStyle = {
@@ -364,7 +375,7 @@ const useDrag = () => {
       return itemStyle
     }
     return { order: index }
-  }, [ listState, grabbingIndex, dragStart, itemWrap, shouldShift, shouldWrap, getDropPosition, previousState ])
+  }, [ listState, grabbingIndex, dragStart, itemWrap, shouldShift, shouldWrap, getDropPosition, previousState, draggingOver ])
 
   // dispatch custom events on the list based on state and drag change
   React.useEffect(() => {
